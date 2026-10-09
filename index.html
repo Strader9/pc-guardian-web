@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <title>人生选择题生成器</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            background-color: #0f1023;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        header {
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .logo {
+            font-size: 24px;
+            color: #7c4dff;
+        }
+        input[type="text"] {
+            width: 90%;
+            max-width: 600px;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 16px;
+            border: none;
+            outline: none;
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 999px;
+            border: none;
+            background-color: #7c4dff;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #00e5ff;
+        }
+        .card {
+            background-color: #0f1023;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 20px;
+            margin: 10px;
+            width: 90%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .card h2 {
+            color: #7c4dff;
+            margin-bottom: 10px;
+        }
+        .option {
+            text-align: center;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .option:hover {
+            transform: scale(1.05);
+        }
+        .vote-count {
+            font-size: 14px;
+            color: #ffffff;
+            margin-top: 5px;
+        }
+        footer {
+            margin-top: auto;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">人生选择题</div>
+        <input type="text" id="dilemmaInput" placeholder="输入你的困境..." />
+        <button onclick="generateOptions()">生成选项</button>
+        <a href="/daily" style="margin-left: 10px; color: #7c4dff;">今日脑洞</a>
+    </header>
+
+    <script>
+        const act = ["抛硬币决定", "原地转三圈", "问一只路过的猫", "把决定权交给外卖小哥", "掷骰子", "反向执行", "让手机助手帮你选"];
+        const obj = ["外星人", "小区保安", "楼下便利店老板", "未来穿越回来的自己", "一只柯基", "广场舞阿姨"];
+        const time = ["凌晨三点", "下暴雨时", "周一早高峰", "吃夜宵时", "宿醉醒来时", "年会当天"];
+        const prop = ["用左手", "穿睡衣", "边吃泡面边", "对着镜子", "用儿童贴纸", "戴耳机"];
+        const conseq_ridiculous = ["获得楼下流浪猫的认可", "被神秘力量选中", "成为小区传说", "解锁隐藏剧情", "从此被超市老板记住"];
+
+        function generateOptions() {
+            const input = document.getElementById("dilemmaInput").value.trim();
+            if (!input || !/^[^\\s]{2,50}$/.test(input)) {
+                alert("先说说你在纠结啥");
+                return;
+            }
+            const optionsContainer = document.createElement('div');
+            optionsContainer.style.display = 'flex';
+            optionsContainer.style.flexWrap = 'wrap';
+            optionsContainer.style.justifyContent = 'space-around';
+
+            let generatedOptions = [];
+            for (let i = 0; i < 4; i++) {
+                let optionText = "";
+                if (i === 3) {
+                    optionText = `认真选项：直接解决「${input}」，反正人生总要试试`;
+                } else {
+                    const randomAct = act[Math.floor(Math.random() * act.length)];
+                    const randomObj = obj[Math.floor(Math.random() * obj.length)];
+                    const randomTime = time[Math.floor(Math.random() * time.length)];
+                    const randomProp = prop[Math.floor(Math.random() * prop.length)];
+                    const randomConseq = conseq_ridiculous[Math.floor(Math.random() * conseq_ridiculous.length)];
+
+                    switch (Math.floor(Math.random() * 7)) {
+                        case 0:
+                            optionText = `把「${input}」交给${randomObj}决定`;
+                            break;
+                        case 1:
+                            optionText = `${randomTime}，${randomAct}，然后${randomConseq}`;
+                            break;
+                        case 2:
+                            optionText = `让${randomObj}帮你选「${input}」，选完${randomConseq}`;
+                            break;
+                        case 3:
+                            optionText = `用${randomProp}去解决「${input}」，${randomConseq}`;
+                            break;
+                        case 4:
+                            optionText = `把「${input}」做成选择题，${randomObj}选 A 你就听${randomObj}的`;
+                            break;
+                        case 5:
+                            optionText = `${randomTime}，${randomAct}，把结果告诉${randomObj}`;
+                            break;
+                        default:
+                            optionText = "要不就「" + input + "」吧，反正人生总要试试";
+                    }
+                }
+
+                generatedOptions.push({
+                    text: optionText,
+                    type: i === 3 ? 'serious' : 'ridiculous'
+                });
+            }
+
+            for (let option of generatedOptions) {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <h2>【我选了】</h2>
+                    <p>${option.text}</p>
+                    <button onclick="revealConsequence('${option.text}', '${input}')">揭示后果</button>
+                `;
+                optionsContainer.appendChild(card);
+            }
+
+            document.body.replaceChild(optionsContainer, document.getElementById("dilemmaInput"));
+        }
+
+        function revealConsequence(optionText, dilemma) {
+            alert(`你选择了：\n\n${optionText}\n\n后果是：\n\n随机生成`);
+        }
+
+        function generateShareImage() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1080;
+            canvas.height = 1080;
+            const ctx = canvas.getContext('2d');
+
+            // Draw background
+            ctx.fillStyle = '#0f1023';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw logo and date
+            ctx.font = "bold 40px PingFang SC";
+            ctx.fillStyle = "#7c4dff";
+            ctx.fillText("人生选择题", 50, 60);
+
+            // Draw dilemma text
+            ctx.font = "20px PingFang SC";
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText("我的纠结", 50, 120);
+            ctx.fillText(dilemma, 50, 150);
+
+            // Draw selected option
+            ctx.font = "20px PingFang SC";
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText("【我选了】", 50, 200);
+            ctx.fillText(optionText, 50, 230);
+
+            // Draw consequence
+            ctx.font = "20px PingFang SC";
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText("后果文案", 50, 280);
+            ctx.fillText(consequenceText, 50, 310);
+
+            // Draw vote count
+            ctx.font = "16px PingFang SC";
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(`已有 ${voteCount} 人同样选了`, 50, 360);
+
+            // Draw QR code (placeholder)
+            const qrCodeCanvas = document.createElement('canvas');
+            qrCodeCanvas.width = 200;
+            qrCodeCanvas.height = 200;
+            const qrCtx = qrCodeCanvas.getContext('2d');
+            qrCtx.fillStyle = '#0f1023';
+            qrCtx.fillRect(0, 0, qrCodeCanvas.width, qrCodeCanvas.height);
+            qrCtx.fillStyle = '#7c4dff';
+            qrCtx.font = 'bold 100px PingFang SC';
+            qrCtx.textAlign = 'center';
+            qrCtx.textBaseline = 'middle';
+            qrCtx.fillText("QR", qrCodeCanvas.width / 2, qrCodeCanvas.height / 2);
+            ctx.drawImage(qrCodeCanvas, 50, 400, 200, 200);
+
+            const dataURL = canvas.toDataURL();
+            const link = document.createElement('a');
+            link.href = dataURL;
+            link.download = '人生选择题.png';
+            link.textContent = "下载图片";
+            document.body.appendChild(link);
+        }
+
+        function generateDailyQuestion() {
+            alert("今日脑洞：\n\n随机生成一个题目，投票榜显示");
+        }
+    </script>
+</body>
+</html>
