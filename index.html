@@ -4,94 +4,155 @@
     <meta charset="UTF-8" />
     <title>人生选择题生成器</title>
     <style>
+        :root {
+            --bg-color: #0f1023;
+            --main-color: #7c4dff;
+            --accent-color: #00e5ff;
+            --serious-color: #22c55e;
+            --text-color: #ffffff;
+            --card-border-radius: 16px;
+            --button-border-radius: 999px;
+        }
+
         body {
             margin: 0;
             font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-            background-color: #0f1023;
-            color: #ffffff;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             display: flex;
             flex-direction: column;
             align-items: center;
-        }
-        header {
-            width: 100%;
             padding: 20px;
-            text-align: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
-        .logo {
-            font-size: 24px;
-            color: #7c4dff;
-        }
-        input[type="text"] {
-            width: 90%;
+
+        .container {
+            width: 100%;
             max-width: 600px;
-            padding: 10px;
-            font-size: 16px;
-            border-radius: 16px;
-            border: none;
-            outline: none;
-            box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+            box-sizing: border-box;
         }
-        button {
-            margin-top: 10px;
-            padding: 10px 20px;
-            font-size: 16px;
-            border-radius: 999px;
+
+        h1, h2 {
+            text-align: center;
+            color: var(--main-color);
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
             border: none;
-            background-color: #7c4dff;
+            border-radius: var(--card-border-radius);
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: none;
+            border-radius: var(--button-border-radius);
+            background-color: var(--main-color);
+            color: white;
             cursor: pointer;
             transition: background-color 0.3s ease;
         }
+
         button:hover {
-            background-color: #00e5ff;
+            background-color: #6a4aff;
         }
+
         .card {
-            background-color: #0f1023;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 20px;
-            margin: 10px;
-            width: 90%;
-            max-width: 600px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: var(--card-border-radius);
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
         }
-        .card h2 {
-            color: #7c4dff;
+
+        .option-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: var(--card-border-radius);
             margin-bottom: 10px;
         }
-        .option {
-            text-align: center;
-            margin: 10px 0;
-            cursor: pointer;
-            transition: all 0.3s ease;
+
+        .option-text {
+            font-size: 16px;
         }
-        .option:hover {
-            transform: scale(1.05);
-        }
+
         .vote-count {
             font-size: 14px;
-            color: #ffffff;
-            margin-top: 5px;
+            color: var(--accent-color);
         }
-        footer {
-            margin-top: auto;
-            padding: 20px;
+
+        .qr-code {
+            width: 100%;
+            height: auto;
+            margin-top: 10px;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .daily-question {
             text-align: center;
-            font-size: 12px;
-            color: #888;
+            margin-bottom: 20px;
+        }
+
+        .history-list {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .history-item {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: var(--card-border-radius);
+            padding: 10px;
+            margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
-    <header>
-        <div class="logo">人生选择题</div>
-        <input type="text" id="dilemmaInput" placeholder="输入你的困境..." />
+    <div class="container">
+        <h1>人生选择题生成器</h1>
+
+        <input type="text" id="dilemmaInput" placeholder="请输入你的困境（最多50字）" />
         <button onclick="generateOptions()">生成选项</button>
-        <a href="/daily" style="margin-left: 10px; color: #7c4dff;">今日脑洞</a>
-    </header>
+        <button onclick="navigateToDailyQuestion()">今日脑洞</button>
+
+        <div id="resultSection" style="display:none;">
+            <div class="card">
+                <p><strong>我的纠结：</strong><span id="userDilemma"></span></p>
+                <div id="optionsContainer"></div>
+                <button onclick="voteForOption()">投票</button>
+                <button onclick="rerollOptions()">换一批</button>
+                <button onclick="goBackToHome()">再来一题</button>
+            </div>
+        </div>
+
+        <div id="shareSection" style="display:none;">
+            <canvas id="qrCanvas" width="1080" height="1080"></canvas>
+            <button onclick="downloadQRCode()">下载图片</button>
+            <button onclick="copyQRCode()">复制链接</button>
+        </div>
+
+        <div id="dailyQuestionSection" style="display:none;">
+            <div class="daily-question">
+                <h2>今日脑洞</h2>
+                <p><strong>题目：</strong><span id="dailyDilemma"></span></p>
+                <div id="dailyOptionsContainer"></div>
+                <button onclick="voteForDailyOption()">投票</button>
+                <ul id="historyList" class="history-list"></ul>
+            </div>
+        </div>
+    </div>
 
     <script>
         const act = ["抛硬币决定", "原地转三圈", "问一只路过的猫", "把决定权交给外卖小哥", "掷骰子", "反向执行", "让手机助手帮你选"];
@@ -99,140 +160,240 @@
         const time = ["凌晨三点", "下暴雨时", "周一早高峰", "吃夜宵时", "宿醉醒来时", "年会当天"];
         const prop = ["用左手", "穿睡衣", "边吃泡面边", "对着镜子", "用儿童贴纸", "戴耳机"];
         const conseq_ridiculous = ["获得楼下流浪猫的认可", "被神秘力量选中", "成为小区传说", "解锁隐藏剧情", "从此被超市老板记住"];
+        const fallbacks = ["要不就「{D}」吧，反正人生总要试试", "掷硬币决定「{D}」，字面朝上就冲", "把「{D}」交给明天的自己"];
+
+        let currentDilemma = "";
+        let options = [];
+        let votes = {};
+        let history = [];
 
         function generateOptions() {
             const input = document.getElementById("dilemmaInput").value.trim();
-            if (!input || !/^[^\\s]{2,50}$/.test(input)) {
-                alert("先说说你在纠结啥");
-                return;
-            }
-            const optionsContainer = document.createElement('div');
-            optionsContainer.style.display = 'flex';
-            optionsContainer.style.flexWrap = 'wrap';
-            optionsContainer.style.justifyContent = 'space-around';
+            if (!isValidInput(input)) return;
 
-            let generatedOptions = [];
+            currentDilemma = input;
+            document.getElementById("userDilemma").textContent = currentDilemma;
+
+            options = [];
             for (let i = 0; i < 4; i++) {
-                let optionText = "";
-                if (i === 3) {
-                    optionText = `认真选项：直接解决「${input}」，反正人生总要试试`;
-                } else {
-                    const randomAct = act[Math.floor(Math.random() * act.length)];
-                    const randomObj = obj[Math.floor(Math.random() * obj.length)];
-                    const randomTime = time[Math.floor(Math.random() * time.length)];
-                    const randomProp = prop[Math.floor(Math.random() * prop.length)];
-                    const randomConseq = conseq_ridiculous[Math.floor(Math.random() * conseq_ridiculous.length)];
-
-                    switch (Math.floor(Math.random() * 7)) {
-                        case 0:
-                            optionText = `把「${input}」交给${randomObj}决定`;
-                            break;
-                        case 1:
-                            optionText = `${randomTime}，${randomAct}，然后${randomConseq}`;
-                            break;
-                        case 2:
-                            optionText = `让${randomObj}帮你选「${input}」，选完${randomConseq}`;
-                            break;
-                        case 3:
-                            optionText = `用${randomProp}去解决「${input}」，${randomConseq}`;
-                            break;
-                        case 4:
-                            optionText = `把「${input}」做成选择题，${randomObj}选 A 你就听${randomObj}的`;
-                            break;
-                        case 5:
-                            optionText = `${randomTime}，${randomAct}，把结果告诉${randomObj}`;
-                            break;
-                        default:
-                            optionText = "要不就「" + input + "」吧，反正人生总要试试";
-                    }
-                }
-
-                generatedOptions.push({
-                    text: optionText,
-                    type: i === 3 ? 'serious' : 'ridiculous'
-                });
+                const template = getRandomTemplate();
+                const optionText = replacePlaceholders(template, currentDilemma);
+                options.push({ text: optionText });
             }
 
-            for (let option of generatedOptions) {
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.innerHTML = `
-                    <h2>【我选了】</h2>
-                    <p>${option.text}</p>
-                    <button onclick="revealConsequence('${option.text}', '${input}')">揭示后果</button>
+            renderOptions();
+            showResultSection();
+        }
+
+        function isValidInput(input) {
+            if (input === "" || input.length < 2) {
+                alert("先说说你在纠结啥");
+                return false;
+            }
+            if (input.length > 50) {
+                alert("最多 50 字哦");
+                return false;
+            }
+            if (/^[^\w\s]+$/.test(input)) {
+                alert("说点具体的吧");
+                return false;
+            }
+            return true;
+        }
+
+        function getRandomTemplate() {
+            const templates = [
+                { type: 'T01', format: "把「{D}」交给{obj}决定" },
+                { type: 'T02', format: "{time}，{act}，然后{conseq_ridiculous}" },
+                { type: 'T04', format: "让{obj}帮你选「{D}」，选完{conseq_ridiculous}" },
+                { type: 'T05', format: "用{prop}去解决「{D}」，{conseq_ridiculous}" },
+                { type: 'T06', format: "把「{D}」做成选择题，{obj}选 A 你就听{obj}的" },
+                { type: 'T07', format: "{time}，{act}，把结果告诉{obj}" }
+            ];
+
+            const randomIndex = Math.floor(Math.random() * templates.length);
+            const template = templates[randomIndex];
+
+            let result = "";
+            if (template.type === 'T01') {
+                const objPick = pickRandom(obj);
+                result = `把「${currentDilemma}」交给${objPick}决定`;
+            } else if (template.type === 'T02') {
+                const timePick = pickRandom(time);
+                const actPick = pickRandom(act);
+                const conseqPick = pickRandom(conseq_ridiculous);
+                result = `${timePick}，${actPick}，然后${conseqPick}`;
+            } else if (template.type === 'T04') {
+                const objPick = pickRandom(obj);
+                const conseqPick = pickRandom(conseq_rid, currentDilemma);
+                result = `让${objPick}帮你选「${currentDilemma}」，选完${conseqPick}`;
+            } else if (template.type === 'T05') {
+                const propPick = pickRandom(prop);
+                const conseqPick = pickRandom(conseq_ridiculous);
+                result = `用${propPick}去解决「${currentDilemma}」，${conseqPick}`;
+            } else if (template.type === 'T06') {
+                const objPick = pickRandom(obj);
+                result = `把「${currentDilemma}」做成选择题，${objPick}选 A 你就听${objPick}的`;
+            } else if (template.type === 'T07') {
+                const timePick = pickRandom(time);
+                const actPick = pickRandom(act);
+                const objPick = pickRandom(obj);
+                result = `${timePick}，${actPick}，把结果告诉${objPick}`;
+            }
+
+            return result;
+        }
+
+        function replacePlaceholders(template, dilemma) {
+            let text = template;
+            if (text.includes("{D}")) {
+                text = text.replace("{D}", dilemma);
+            }
+            return text;
+        }
+
+        function pickRandom(array) {
+            return array[Math.floor(Math.random() * array.length)];
+        }
+
+        function renderOptions() {
+            const container = document.getElementById("optionsContainer");
+            container.innerHTML = "";
+            options.forEach((option, index) => {
+                const div = document.createElement("div");
+                div.className = "option-card";
+                div.innerHTML = `
+                    <span class="option-text">${option.text}</span>
+                    <span class="vote-count">已有 ${votes[index] || 0} 人同样选了</span>
                 `;
-                optionsContainer.appendChild(card);
+                container.appendChild(div);
+            });
+        }
+
+        function voteForOption() {
+            const selectedOption = getSelectedOption();
+            if (!selectedOption) return;
+
+            votes[selectedOption.index] = (votes[selectedOption.index] || 0) + 1;
+            updateVoteCounts();
+        }
+
+        function rerollOptions() {
+            generateOptions();
+        }
+
+        function goBackToHome() {
+            hideResultSection();
+            showHomePage();
+        }
+
+        function navigateToDailyQuestion() {
+            fetch('/daily-question')
+                .then(response => response.json())
+                .then(data => {
+                    currentDilemma = data.dilemma;
+                    document.getElementById("dailyDilemma").textContent = currentDilemma;
+                    options = JSON.parse(data.options_json);
+                    votes = {};
+                    for (let i = 0; i < options.length; i++) {
+                        votes[i] = 0;
+                    }
+                    renderDailyOptions();
+                    showDailyQuestionSection();
+                })
+                .catch(error => console.error('Error fetching daily question:', error));
+        }
+
+        function renderDailyOptions() {
+            const container = document.getElementById("dailyOptionsContainer");
+            container.innerHTML = "";
+            options.forEach((option, index) => {
+                const div = document.createElement("div");
+                div.className = "option-card";
+                div.innerHTML = `
+                    <span class="option-text">${option.text}</span>
+                    <span class="vote-count">已有 ${votes[index]} 人同样选了</span>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function voteForDailyOption() {
+            const selectedOption = getSelectedOption();
+            if (!selectedOption) return;
+
+            votes[selectedOption.index] = (votes[selectedOption.index] || 0) + 1;
+            updateVoteCounts();
+        }
+
+        function updateVoteCounts() {
+            const containers = document.querySelectorAll(".vote-count");
+            containers.forEach((container, index) => {
+                container.textContent = `已有 ${votes[index]} 人同样选了`;
+            });
+        }
+
+        function getSelectedOption() {
+            const cards = document.querySelectorAll(".option-card");
+            for (let i = 0; i < cards.length; i++) {
+                const card = cards[i];
+                if (card.classList.contains("selected")) {
+                    return { text: card.querySelector(".option-text").textContent, index: i };
+                }
             }
-
-            document.body.replaceChild(optionsContainer, document.getElementById("dilemmaInput"));
+            return null;
         }
 
-        function revealConsequence(optionText, dilemma) {
-            alert(`你选择了：\n\n${optionText}\n\n后果是：\n\n随机生成`);
+        function showResultSection() {
+            hideHomePage();
+            showResultSection();
         }
 
-        function generateShareImage() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 1080;
-            canvas.height = 1080;
-            const ctx = canvas.getContext('2d');
-
-            // Draw background
-            ctx.fillStyle = '#0f1023';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Draw logo and date
-            ctx.font = "bold 40px PingFang SC";
-            ctx.fillStyle = "#7c4dff";
-            ctx.fillText("人生选择题", 50, 60);
-
-            // Draw dilemma text
-            ctx.font = "20px PingFang SC";
-            ctx.fillStyle = "#ffffff";
-            ctx.fillText("我的纠结", 50, 120);
-            ctx.fillText(dilemma, 50, 150);
-
-            // Draw selected option
-            ctx.font = "20px PingFang SC";
-            ctx.fillStyle = "#ffffff";
-            ctx.fillText("【我选了】", 50, 200);
-            ctx.fillText(optionText, 50, 230);
-
-            // Draw consequence
-            ctx.font = "20px PingFang SC";
-            ctx.fillStyle = "#ffffff";
-            ctx.fillText("后果文案", 50, 280);
-            ctx.fillText(consequenceText, 50, 310);
-
-            // Draw vote count
-            ctx.font = "16px PingFang SC";
-            ctx.fillStyle = "#ffffff";
-            ctx.fillText(`已有 ${voteCount} 人同样选了`, 50, 360);
-
-            // Draw QR code (placeholder)
-            const qrCodeCanvas = document.createElement('canvas');
-            qrCodeCanvas.width = 200;
-            qrCodeCanvas.height = 200;
-            const qrCtx = qrCodeCanvas.getContext('2d');
-            qrCtx.fillStyle = '#0f1023';
-            qrCtx.fillRect(0, 0, qrCodeCanvas.width, qrCodeCanvas.height);
-            qrCtx.fillStyle = '#7c4dff';
-            qrCtx.font = 'bold 100px PingFang SC';
-            qrCtx.textAlign = 'center';
-            qrCtx.textBaseline = 'middle';
-            qrCtx.fillText("QR", qrCodeCanvas.width / 2, qrCodeCanvas.height / 2);
-            ctx.drawImage(qrCodeCanvas, 50, 400, 200, 200);
-
-            const dataURL = canvas.toDataURL();
-            const link = document.createElement('a');
-            link.href = dataURL;
-            link.download = '人生选择题.png';
-            link.textContent = "下载图片";
-            document.body.appendChild(link);
+        function showDailyQuestionSection() {
+            hideHomePage();
+            showDailyQuestionSection();
         }
 
-        function generateDailyQuestion() {
-            alert("今日脑洞：\n\n随机生成一个题目，投票榜显示");
+        function hideResultSection() {
+            document.getElementById("resultSection").style.display = "none";
+        }
+
+        function hideDailyQuestionSection() {
+            document.getElementById("dailyQuestionSection").style.display = "none";
+        }
+
+        function showHomePage() {
+            document.getElementById("resultSection").style.display = "none";
+            document.getElementById("dailyQuestionSection").style.display = "none";
+        }
+
+        function downloadQRCode() {
+            const canvas = document.getElementById("qrCanvas");
+            const link = document.createElement("a");
+            link.download = "choice-question.png";
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        function copyQRCode() {
+            navigator.clipboard.writeText(window.location.href).then(() => alert("链接已复制"));
+        }
+
+        function fetchHistory() {
+            // Simulate fetching history from local storage
+            history = JSON.parse(localStorage.getItem('history') || '[]');
+            renderHistoryList();
+        }
+
+        function renderHistoryList() {
+            const list = document.getElementById("historyList");
+            list.innerHTML = "";
+            history.forEach(item => {
+                const li = document.createElement("li");
+                li.className = "history-item";
+                li.textContent = item;
+                list.appendChild(li);
+            });
         }
     </script>
 </body>
