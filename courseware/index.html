@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>LENS LAB · 凸透镜成像实验</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; background: #070b14; }
+  body {
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #e8ecf4; touch-action: none;
+  }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    padding: 14px 18px;
+    background: linear-gradient(180deg, rgba(7,11,20,.85), rgba(7,11,20,0));
+    display: flex; align-items: center; gap: 8px; pointer-events: none;
+  }
+  .brand {
+    font-weight: 700; letter-spacing: .12em; font-size: 17px;
+    background: linear-gradient(90deg, #f0abfc, #818cf8);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .brand small { font-size: 11px; font-weight: 400; letter-spacing: .2em; color: #64748b; -webkit-text-fill-color: #64748b; }
+
+  /* 数据面板 */
+  #hud {
+    position: fixed; z-index: 15; right: 18px; top: 64px; width: 228px;
+    background: rgba(13,18,32,.55);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,.1); border-radius: 16px; padding: 14px 16px;
+    animation: rise .5s ease both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  #hud h3 { font-size: 11px; letter-spacing: .22em; color: #f0abfc; font-weight: 600; margin-bottom: 10px; }
+  .row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; color: #94a3b8; }
+  .row b { color: #e8ecf4; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .row b.hot { color: #22d3ee; }
+  #nature {
+    margin-top: 10px; padding: 10px 12px; border-radius: 12px; text-align: center;
+    font-size: 14px; font-weight: 700; letter-spacing: .06em;
+    background: linear-gradient(135deg, rgba(99,102,241,.28), rgba(34,211,238,.18));
+    border: 1px solid rgba(129,140,248,.45);
+  }
+
+  /* 控制面板 */
+  #ctrl {
+    position: fixed; z-index: 15; left: 18px; bottom: 18px; width: min(320px, calc(100vw - 36px));
+    background: rgba(13,18,32,.55);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,.1); border-radius: 16px; padding: 16px;
+    animation: rise .5s .1s ease both;
+  }
+  #ctrl label { display: flex; justify-content: space-between; font-size: 13px; color: #cbd5e1; margin-bottom: 10px; }
+  #ctrl label b { color: #f0abfc; font-variant-numeric: tabular-nums; }
+  input[type=range] {
+    width: 100%; appearance: none; -webkit-appearance: none; height: 6px; border-radius: 99px;
+    background: linear-gradient(90deg, #818cf8, #22d3ee); outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    appearance: none; -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #fff, #818cf8);
+    box-shadow: 0 0 14px rgba(129,140,248,.9); cursor: grab;
+  }
+  .hint { font-size: 11.5px; color: #64748b; margin-top: 10px; line-height: 1.6; }
+  .chips { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .chip {
+    flex: 1; min-width: 70px; text-align: center; font-size: 11.5px; padding: 7px 4px;
+    border-radius: 10px; color: #94a3b8; border: 1px solid rgba(255,255,255,.1);
+    background: rgba(255,255,255,.04); cursor: pointer; transition: all .2s ease; user-select: none;
+  }
+  .chip:hover { color: #fff; border-color: rgba(129,140,248,.5); }
+
+  /* 3D 标注 */
+  .marker {
+    position: fixed; z-index: 12; transform: translate(-50%, -100%);
+    pointer-events: none; transition: opacity .25s ease;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .marker .bubble {
+    font-size: 12px; padding: 6px 12px; border-radius: 10px; white-space: nowrap;
+    background: rgba(13,18,32,.78); border: 1px solid rgba(240,171,252,.45);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    animation: pop .25s cubic-bezier(.3,1.6,.5,1) both;
+  }
+  @keyframes pop { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: scale(1); } }
+  .marker .stem { width: 1.5px; height: 12px; background: linear-gradient(180deg, rgba(240,171,252,.8), transparent); }
+  .marker .tip { width: 6px; height: 6px; border-radius: 50%; background: #f0abfc; box-shadow: 0 0 10px #f0abfc; }
+
+  #infoCard {
+    position: fixed; z-index: 16; left: 50%; bottom: 18px; transform: translateX(-50%) translateY(20px);
+    width: min(420px, calc(100vw - 32px));
+    background: rgba(13,18,32,.62);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,.1); border-radius: 16px; padding: 14px 16px;
+    opacity: 0; pointer-events: none; transition: all .3s cubic-bezier(.2,.8,.2,1);
+  }
+  #infoCard.show { transform: translateX(-50%); opacity: 1; }
+  #infoCard .name { font-size: 15px; font-weight: 700; color: #f0abfc; margin-bottom: 5px; }
+  #infoCard .desc { font-size: 12.5px; color: #94a3b8; line-height: 1.7; }
+
+  #toast {
+    position: fixed; z-index: 50; left: 50%; top: 64px; transform: translateX(-50%);
+    background: rgba(13,18,32,.85); border: 1px solid rgba(255,255,255,.12);
+    padding: 9px 16px; border-radius: 12px; font-size: 13px;
+    opacity: 0; transition: all .3s ease; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+
+  @media (max-width: 640px) {
+    #hud { right: 12px; top: 56px; width: 44vw; padding: 10px 12px; }
+    .row { font-size: 11.5px; }
+    #nature { font-size: 12px; padding: 8px; }
+    #ctrl { left: 12px; bottom: 12px; padding: 12px; }
+    .brand small { display: none; }
+    #infoCard { bottom: 130px; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div class="topbar">
+  <div class="brand">LENS LAB<small>凸透镜成像 · 交互实验</small></div>
+</div>
+
+<div id="hud">
+  <h3>实时数据</h3>
+  <div class="row"><span>物距 u</span><b id="vU">—</b></div>
+  <div class="row"><span>像距 v</span><b id="vV">—</b></div>
+  <div class="row"><span>放大率 m</span><b id="vM" class="hot">—</b></div>
+  <div id="nature">—</div>
+</div>
+
+<div id="ctrl">
+  <label>物距 u（焦距 f = 10 cm）<b id="uVal">20 cm</b></label>
+  <input type="range" id="uRange" min="4" max="40" step="0.5" value="20">
+  <div class="chips">
+    <div class="chip" data-u="30">u &gt; 2f</div>
+    <div class="chip" data-u="20">u = 2f</div>
+    <div class="chip" data-u="15">f&lt;u&lt;2f</div>
+    <div class="chip" data-u="8">u &lt; f</div>
+  </div>
+  <p class="hint">拖动滑块调节物距 · 单指旋转视角 · 双指缩放 · 点击部件查看考点</p>
+</div>
+
+<div id="infoCard">
+  <div class="name" id="icName">—</div>
+  <div class="desc" id="icDesc">—</div>
+</div>
+<div id="toast"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ══════════ 常量与场景 ══════════ */
+const F = 10;                 // 焦距 cm
+const SCALE = 0.2;            // 1 单位 = 5 cm
+const LENS_R = 1.15;
+const CANDLE_H = 1.3;         // 蜡烛高（单位）
+
+const app = document.getElementById('app');
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x070b14, 0.02);
+
+const camera = new THREE.PerspectiveCamera(46, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(1.5, 6.5, 15);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x070b14, 1);
+app.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.target.set(0, 1.2, 0);
+controls.maxPolarAngle = Math.PI * 0.55;
+
+scene.add(new THREE.AmbientLight(0x8fa3c8, 0.5));
+const key = new THREE.DirectionalLight(0xffffff, 1.8);
+key.position.set(5, 12, 8);
+scene.add(key);
+const rim = new THREE.PointLight(0xf0abfc, 26, 40);
+rim.position.set(-10, 5, -8);
+scene.add(rim);
+
+/* 星空 */
+{
+  const n = 700, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const r = 45 + Math.random() * 55, t = Math.random() * Math.PI * 2, p = Math.acos(2 * Math.random() - 1);
+    pos[i*3] = r * Math.sin(p) * Math.cos(t); pos[i*3+1] = r * Math.cos(p); pos[i*3+2] = r * Math.sin(p) * Math.sin(t);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const stars = new THREE.Points(g, new THREE.PointsMaterial({ color: 0x9db2d8, size: 0.12, transparent: true, opacity: 0.7 }));
+  scene.add(stars);
+  scene.userData.stars = stars;
+}
+
+/* ══════════ 光具座 ══════════ */
+const bench = new THREE.Group();
+{
+  const rail = new THREE.Mesh(
+    new THREE.BoxGeometry(24, 0.16, 0.8),
+    new THREE.MeshStandardMaterial({ color: 0x131c30, metalness: 0.8, roughness: 0.3 })
+  );
+  rail.position.y = 0.08;
+  bench.add(rail);
+  /* 刻度：每 2cm（0.4 单位）一格，每 10cm 一格加高 */
+  const tickMat1 = new THREE.MeshBasicMaterial({ color: 0x2a3a55 });
+  const tickMat2 = new THREE.MeshBasicMaterial({ color: 0x4c5f85 });
+  for (let cm = -40; cm <= 60; cm += 2) {
+    const big = cm % 10 === 0;
+    const t = new THREE.Mesh(new THREE.BoxGeometry(0.03, big ? 0.14 : 0.07, 0.85), big ? tickMat2 : tickMat1);
+    t.position.set(cm * SCALE, 0.2, 0);
+    bench.add(t);
+  }
+  const glow = new THREE.Mesh(
+    new THREE.BoxGeometry(24, 0.02, 0.06),
+    new THREE.MeshBasicMaterial({ color: 0x818cf8, transparent: true, opacity: 0.5 })
+  );
+  glow.position.set(2, 0.18, 0.44);
+  bench.add(glow);
+}
+scene.add(bench);
+
+/* ══════════ 蜡烛 ══════════ */
+const candle = new THREE.Group();
+let flame, flameLight;
+{
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.14, 0.16, CANDLE_H, 24),
+    new THREE.MeshStandardMaterial({ color: 0xf5f0e8, roughness: 0.5 })
+  );
+  body.position.y = CANDLE_H / 2;
+  candle.add(body);
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.3, 0.34, 0.1, 24),
+    new THREE.MeshStandardMaterial({ color: 0x818cf8, metalness: 0.6, roughness: 0.3 })
+  );
+  base.position.y = 0.05;
+  candle.add(base);
+  flame = new THREE.Mesh(
+    new THREE.SphereGeometry(0.09, 16, 16),
+    new THREE.MeshBasicMaterial({ color: 0xffc966 })
+  );
+  flame.scale.set(0.8, 1.5, 0.8);
+  flame.position.y = CANDLE_H + 0.12;
+  candle.add(flame);
+  flameLight = new THREE.PointLight(0xffb545, 8, 8);
+  flameLight.position.y = CANDLE_H + 0.15;
+  candle.add(flameLight);
+  candle.userData.label = { name: '蜡烛（物）', desc: '发光的物体就是"物"。它到透镜光心的距离叫物距 u。移动蜡烛，观察像怎么变——这就是本实验要动手的部分。' };
+}
+scene.add(candle);
+
+/* ══════════ 透镜 ══════════ */
+const lensGroup = new THREE.Group();
+{
+  const glass = new THREE.Mesh(
+    new THREE.CylinderGeometry(LENS_R, LENS_R, 0.16, 48),
+    new THREE.MeshPhysicalMaterial({
+      color: 0xbfe8ff, metalness: 0, roughness: 0.05,
+      transparent: true, opacity: 0.32,
+      transmission: 0.9, thickness: 0.3
+    })
+  );
+  glass.rotation.z = Math.PI / 2;   // 镜面法线朝 x 方向
+  lensGroup.add(glass);
+  const rimRing = new THREE.Mesh(
+    new THREE.TorusGeometry(LENS_R + 0.04, 0.045, 12, 64),
+    new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.9, roughness: 0.2, emissive: 0x0c4a6e })
+  );
+  rimRing.rotation.y = Math.PI / 2;
+  lensGroup.add(rimRing);
+  const stand = new THREE.Mesh(
+    new THREE.BoxGeometry(0.1, 2.4, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0x1c2941, metalness: 0.7, roughness: 0.4 })
+  );
+  stand.position.y = -1.2 + 0.1;
+  lensGroup.add(stand);
+  lensGroup.position.y = LENS_R + 0.25;
+  lensGroup.userData.label = { name: '凸透镜', desc: '中间厚、边缘薄。对光线有会聚作用。本实验 f = 10 cm。判断成像性质的关键分界：2f（倒立等大）和 f（不成像）。' };
+}
+scene.add(lensGroup);
+
+/* ══════════ 光屏 ══════════ */
+const screenGroup = new THREE.Group();
+let screenPlane;
+{
+  screenPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.4, 2.4),
+    new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.9, emissive: 0x223344, emissiveIntensity: 0.35 })
+  );
+  screenPlane.rotation.y = -Math.PI / 2;   // 面朝透镜
+  screenGroup.add(screenPlane);
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(0.06, 2.5, 2.5),
+    new THREE.MeshStandardMaterial({ color: 0x1c2941, metalness: 0.7, roughness: 0.4 })
+  );
+  frame.position.x = 0.05;
+  screenGroup.add(frame);
+  const stand = new THREE.Mesh(
+    new THREE.BoxGeometry(0.1, 1.3, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0x1c2941, metalness: 0.7, roughness: 0.4 })
+  );
+  stand.position.y = -0.65;
+  screenGroup.add(stand);
+  screenGroup.userData.label = { name: '光屏', desc: '承接实像。光屏上能接到的一定是实像（倒立）；虚像只能用眼睛透过透镜看，光屏上是没有的。' };
+}
+scene.add(screenGroup);
+
+/* ══════════ 像（半透明蜡烛轮廓） ══════════ */
+const imageCandle = new THREE.Group();
+{
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.14, 0.16, CANDLE_H, 24),
+    new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.45 })
+  );
+  body.position.y = CANDLE_H / 2;
+  imageCandle.add(body);
+  const flameImg = new THREE.Mesh(
+    new THREE.SphereGeometry(0.09, 16, 16),
+    new THREE.MeshBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.6 })
+  );
+  flameImg.scale.set(0.8, 1.5, 0.8);
+  flameImg.position.y = CANDLE_H + 0.12;
+  imageCandle.add(flameImg);
+  imageCandle.visible = false;
+}
+scene.add(imageCandle);
+
+/* ══════════ 光线 + 流动光点 ══════════ */
+const rayMat = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.75 });
+let rayLine = null;
+const flowDots = [];
+{
+  const dotGeo = new THREE.SphereGeometry(0.05, 10, 10);
+  const dotMat = new THREE.MeshBasicMaterial({ color: 0xa5f3fc });
+  for (let i = 0; i < 4; i++) {
+    const d = new THREE.Mesh(dotGeo, dotMat);
+    d.visible = false;
+    scene.add(d);
+    flowDots.push(d);
+  }
+}
+
+function rebuildRay(candleTopWorld, imageTopWorld) {
+  if (rayLine) { scene.remove(rayLine); rayLine.geometry.dispose(); rayLine = null; }
+  const mid = new THREE.Vector3(0, lensGroup.position.y + LENS_R * 0.75, candleTopWorld.z);
+  const pts = [candleTopWorld, mid, imageTopWorld];
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  rayLine = new THREE.Line(geo, rayMat);
+  scene.add(rayLine);
+  flowDots.forEach((d, i) => { d.userData.seg = i % 2; d.userData.t = i / 4; d.visible = true; });
+  flowDots.forEach(d => d.userData.path = pts);
+}
+
+/* ══════════ 物理计算与状态更新 ══════════ */
+const uRange = document.getElementById('uRange');
+const uVal = document.getElementById('uVal');
+const vU = document.getElementById('vU');
+const vV = document.getElementById('vV');
+const vM = document.getElementById('vM');
+const natureEl = document.getElementById('nature');
+
+function update() {
+  const u = parseFloat(uRange.value);           // cm
+  const eps = 0.01;
+  let v, m, nature, screenX, imageVisible = false, imageInverted = false, imageOpacity = 0.45;
+
+  const nearF = Math.abs(u - F) < eps;
+  if (nearF) {
+    v = Infinity; m = Infinity;
+    nature = 'u = f · 不成像（平行光射出）';
+  } else if (u < F) {
+    v = (u * F) / (u - F);                       // 负值：同侧虚像
+    m = Math.abs(v / u);
+    nature = `u < f · 正立、放大的虚像（×${m.toFixed(2)}）`;
+    imageVisible = true; imageInverted = false; imageOpacity = 0.3;
+  } else {
+    v = (u * F) / (u - F);                       // 正值：实像
+    m = v / u;
+    nature = u > 2 * F ? `u > 2f · 倒立、缩小的实像（×${m.toFixed(2)}）`
+           : Math.abs(u - 2 * F) < eps ? `u = 2f · 倒立、等大的实像（×${m.toFixed(2)}）`
+           : `f < u < 2f · 倒立、放大的实像（×${m.toFixed(2)}）`;
+    imageVisible = true; imageInverted = true;
+  }
+
+  /* 3D 布局（单位 = 5cm） */
+  const uU = u * SCALE;
+  candle.position.x = -uU;
+
+  const vClampU = Math.min(Math.abs(v) * SCALE, 13);
+  screenGroup.position.x = imageVisible && imageInverted ? vClampU : 13;
+  screenGroup.visible = !nearF;
+
+  /* 像蜡烛：实像倒立（火焰朝下）、虚像正立，都以透镜光心高度为基准 */
+  if (imageVisible) {
+    imageCandle.visible = true;
+    const s = Math.min(m, 3.2);
+    imageCandle.scale.set(s, s, s);
+    const baseY = LENS_R + 0.25;
+    imageCandle.position.x = imageInverted ? vClampU : -uU;
+    imageCandle.position.y = baseY;
+    imageCandle.rotation.x = 0;
+    imageCandle.traverse(o => { if (o.material) o.material.opacity = imageOpacity; });
+    const body = imageCandle.children[0], fImg = imageCandle.children[1];
+    body.position.y = imageInverted ? -CANDLE_H / 2 : CANDLE_H / 2;
+    fImg.position.y = imageInverted ? -(CANDLE_H + 0.12) : CANDLE_H + 0.12;
+  } else {
+    imageCandle.visible = false;
+  }
+
+  /* 光线：蜡烛火焰 → 透镜上缘 → 像点/延长方向 */
+  const candleTop = new THREE.Vector3(-uU, LENS_R + 0.25 + CANDLE_H, 0);
+  if (imageVisible && imageInverted) {
+    const imgTop = new THREE.Vector3(vClampU, LENS_R + 0.25 - CANDLE_H * Math.min(m, 3.2), 0);
+    rebuildRay(candleTop, imgTop);
+  } else if (imageVisible) {
+    const imgTop = new THREE.Vector3(-uU + CANDLE_H * Math.min(m, 3.2) * 0.5, LENS_R + 0.25 + CANDLE_H * Math.min(m, 3.2), 0);
+    rebuildRay(candleTop, imgTop);
+  } else {
+    /* u = f：平行光射出 */
+    const mid = new THREE.Vector3(0, LENS_R + 0.25 + LENS_R * 0.75, 0);
+    const pts = [candleTop, mid, new THREE.Vector3(14, mid.y, 0)];
+    if (rayLine) { scene.remove(rayLine); rayLine.geometry.dispose(); }
+    rayLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), rayMat);
+    scene.add(rayLine);
+    flowDots.forEach((d, i) => { d.userData.path = pts; d.userData.t = i / 4; d.visible = true; });
+  }
+
+  /* 数据面板 */
+  uVal.textContent = u.toFixed(1) + ' cm';
+  vU.textContent = u.toFixed(1) + ' cm';
+  vV.textContent = nearF ? '∞' : (v >= 0 ? v.toFixed(1) : Math.abs(v).toFixed(1) + '（同侧）') ;
+  vV.classList.toggle('hot', nearF);
+  vM.textContent = nearF ? '∞' : '×' + m.toFixed(2);
+  natureEl.textContent = nature;
+
+  /* 光屏亮度反馈：实像打在屏上 */
+  screenPlane.material.emissiveIntensity = imageInverted ? 0.35 + Math.min(m, 3) * 0.25 : 0.15;
+}
+
+/* 预设按钮 */
+document.querySelectorAll('.chip').forEach(c => {
+  c.addEventListener('click', () => {
+    uRange.value = c.dataset.u;
+    update();
+    toast(c.textContent.trim() + ' · 观察成像变化');
+  });
+});
+uRange.addEventListener('input', update);
+
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ══════════ 点击部件 → 考点标注 ══════════ */
+const raycaster = new THREE.Raycaster();
+const infoCard = document.getElementById('infoCard');
+let downXY = null;
+let curMarker = null;
+
+renderer.domElement.addEventListener('pointerdown', e => { downXY = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downXY) return;
+  const dx = e.clientX - downXY[0], dy = e.clientY - downXY[1];
+  downXY = null;
+  if (dx * dx + dy * dy > 25) return;
+  const ndc = new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects([candle, lensGroup, screenGroup], true);
+  if (!hits.length) { infoCard.classList.remove('show'); removeMarker(); return; }
+  let o = hits[0].object;
+  while (o && !o.userData.label) o = o.parent;
+  if (!o) return;
+  showInfo(o.userData.label);
+  placeMarker(hits[0].point);
+});
+
+function showInfo(label) {
+  document.getElementById('icName').textContent = label.name;
+  document.getElementById('icDesc').textContent = label.desc;
+  infoCard.classList.add('show');
+}
+
+let markerEl = null, markerAnchor = new THREE.Vector3();
+function placeMarker(worldPoint) {
+  removeMarker();
+  markerAnchor.copy(worldPoint);
+  markerEl = document.createElement('div');
+  markerEl.className = 'marker';
+  markerEl.innerHTML = `<div class="bubble">考点</div><div class="stem"></div><div class="tip"></div>`;
+  document.body.appendChild(markerEl);
+}
+function removeMarker() { if (markerEl) { markerEl.remove(); markerEl = null; } }
+
+/* ══════════ 渲染循环 ══════════ */
+const clock = new THREE.Clock();
+const projV = new THREE.Vector3();
+const flowSpeed = 0.5;
+
+function tick() {
+  requestAnimationFrame(tick);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  scene.userData.stars.rotation.y += dt * 0.006;
+
+  /* 火焰闪烁 */
+  const fs = 1 + Math.sin(t * 11) * 0.15 + Math.sin(t * 23) * 0.06;
+  flame.scale.set(0.8 * fs, 1.5 * (1 + Math.sin(t * 9) * 0.12), 0.8 * fs);
+  flameLight.intensity = 7 + Math.sin(t * 11) * 2;
+
+  /* 流动光点：沿折线两段循环 */
+  for (const d of flowDots) {
+    if (!d.visible || !d.userData.path) continue;
+    d.userData.t += dt * flowSpeed;
+    if (d.userData.t > 1) { d.userData.t -= 1; d.userData.seg = (d.userData.seg + 1) % 2; }
+    const pts = d.userData.path, seg = d.userData.seg;
+    const a = pts[seg], b = pts[seg + 1];
+    if (a && b) d.position.lerpVectors(a, b, d.userData.t);
+  }
+
+  /* 考点标注跟随 */
+  if (markerEl) {
+    projV.copy(markerAnchor).project(camera);
+    if (projV.z < 1) {
+      markerEl.style.left = (projV.x * 0.5 + 0.5) * innerWidth + 'px';
+      markerEl.style.top = (-projV.y * 0.5 + 0.5) * innerHeight + 'px';
+      markerEl.style.opacity = 1;
+    } else markerEl.style.opacity = 0;
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+tick();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+update();
+</script>
+</body>
+</html>

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>SORT IT · 垃圾分类挑战</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #e8ecf4; background: #070b14;
+    user-select: none; -webkit-user-select: none;
+    touch-action: none;
+  }
+  /* 背景光斑 */
+  .blob { position: fixed; border-radius: 50%; filter: blur(90px); opacity: .35; pointer-events: none; }
+  .blob.b1 { width: 46vw; height: 46vw; background: #6366f1; top: -18vw; left: -12vw; animation: drift 14s ease-in-out infinite alternate; }
+  .blob.b2 { width: 40vw; height: 40vw; background: #0ea5e9; bottom: -16vw; right: -10vw; animation: drift 18s ease-in-out infinite alternate-reverse; }
+  @keyframes drift { to { transform: translate(6vw, 4vw) scale(1.15); } }
+
+  .stage { position: fixed; inset: 0; display: flex; flex-direction: column; padding: max(14px, env(safe-area-inset-top)) 16px 16px; }
+
+  /* ── 顶栏 ── */
+  .hud { display: flex; align-items: center; gap: 12px; z-index: 5; }
+  .brand {
+    font-weight: 800; font-size: 18px; letter-spacing: .1em;
+    background: linear-gradient(90deg, #4ade80, #22d3ee);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .stats { margin-left: auto; display: flex; gap: 10px; }
+  .stat {
+    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-radius: 12px; padding: 7px 14px; text-align: center;
+  }
+  .stat i { display: block; font-style: normal; font-size: 10px; letter-spacing: .18em; color: #64748b; }
+  .stat b { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #score { color: #4ade80; }
+  #combo { color: #fbbf24; }
+  .bar { height: 5px; border-radius: 99px; background: rgba(255,255,255,.08); margin-top: 12px; overflow: hidden; z-index: 5; }
+  .bar > div {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #4ade80, #22d3ee);
+    border-radius: 99px; transition: width .4s cubic-bezier(.2,.8,.2,1);
+    box-shadow: 0 0 12px rgba(34,211,238,.6);
+  }
+
+  /* ── 物品卡 ── */
+  #cardZone { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
+  #q { text-align: center; font-size: 13px; color: #94a3b8; letter-spacing: .15em; margin-bottom: 14px; }
+  #card {
+    position: relative; z-index: 6; width: 168px; height: 168px; border-radius: 24px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.16);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 18px 60px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.15);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    cursor: grab; will-change: transform;
+    transition: box-shadow .2s ease;
+    animation: cardIn .45s cubic-bezier(.3,1.4,.5,1) both;
+  }
+  @keyframes cardIn { from { opacity: 0; transform: scale(.6) rotate(-4deg); } to { opacity: 1; transform: none; } }
+  #card .emoji { font-size: 52px; filter: drop-shadow(0 6px 16px rgba(0,0,0,.45)); }
+  #card .name { font-size: 16px; font-weight: 700; }
+  #card.dragging { cursor: grabbing; box-shadow: 0 30px 90px rgba(0,0,0,.65); z-index: 30; }
+  #card.shake { animation: shake .4s ease; }
+  @keyframes shake {
+    10%,90% { translate: -6px 0; } 20%,80% { translate: 6px 0; }
+    30%,70% { translate: -8px 0; } 40%,60% { translate: 8px 0; } 50% { translate: 0 0; }
+  }
+  #card.gone { transition: all .4s cubic-bezier(.5,-.2,.8,.5) !important; opacity: 0; }
+
+  /* 连击飘字 */
+  #comboPop {
+    position: fixed; z-index: 40; left: 50%; top: 38%; transform: translateX(-50%);
+    font-size: 30px; font-weight: 800; letter-spacing: .08em;
+    background: linear-gradient(90deg, #fbbf24, #f472b6);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    opacity: 0; pointer-events: none; text-shadow: 0 8px 40px rgba(251,191,36,.35);
+  }
+  #comboPop.show { animation: comboUp .9s cubic-bezier(.2,.9,.3,1) both; }
+  @keyframes comboUp {
+    0% { opacity: 0; transform: translateX(-50%) scale(.5); }
+    25% { opacity: 1; transform: translateX(-50%) scale(1.15); }
+    60% { opacity: 1; transform: translateX(-50%) scale(1); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-46px) scale(.9); }
+  }
+
+  /* ── 分类桶 ── */
+  .bins { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; z-index: 5; }
+  .bin {
+    border-radius: 18px; padding: 14px 6px 12px; text-align: center;
+    background: rgba(255,255,255,.06);
+    border: 1.5px solid rgba(255,255,255,.12);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    transition: all .2s ease; position: relative; overflow: hidden;
+  }
+  .bin .lid { font-size: 30px; line-height: 1.1; }
+  .bin .t { font-size: 13px; font-weight: 700; margin-top: 5px; }
+  .bin .s { font-size: 10px; color: #64748b; margin-top: 2px; letter-spacing: .05em; }
+  .bin::before {
+    content: ''; position: absolute; inset: 0; opacity: .12; transition: opacity .2s ease;
+  }
+  .bin[data-type=recycle]::before { background: radial-gradient(circle at 50% 0%, #22d3ee, transparent 70%); }
+  .bin[data-type=kitchen]::before { background: radial-gradient(circle at 50% 0%, #4ade80, transparent 70%); }
+  .bin[data-type=hazard]::before  { background: radial-gradient(circle at 50% 0%, #f87171, transparent 70%); }
+  .bin[data-type=other]::before   { background: radial-gradient(circle at 50% 0%, #fbbf24, transparent 70%); }
+  .bin.hot { border-color: var(--c); box-shadow: 0 0 0 1.5px var(--c), 0 0 34px -6px var(--c); transform: translateY(-6px) scale(1.04); }
+  .bin.err  { animation: binErr .45s ease; }
+  @keyframes binErr { 25% { translate: -5px 0; } 50% { translate: 5px 0; } 75% { translate: -4px 0; } }
+  .bin.ok   { animation: binOk .35s cubic-bezier(.3,1.5,.5,1); }
+  @keyframes binOk { 40% { transform: scale(1.1); } }
+  .bin .wave {
+    position: absolute; inset: 0; border-radius: 18px; opacity: 0;
+    border: 2px solid var(--c);
+  }
+  .bin.ok .wave { animation: wave .55s ease-out; }
+  @keyframes wave { from { opacity: .9; transform: scale(.9); } to { opacity: 0; transform: scale(1.25); } }
+
+  /* ── 结算面板 ── */
+  #result {
+    position: fixed; inset: 0; z-index: 60; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(7,11,20,.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  #result.show { display: flex; }
+  #result .box {
+    width: min(340px, calc(100vw - 40px)); border-radius: 24px; text-align: center;
+    background: rgba(13,18,32,.85); border: 1px solid rgba(255,255,255,.14);
+    padding: 28px 24px; animation: pop2 .4s cubic-bezier(.3,1.5,.5,1) both;
+  }
+  @keyframes pop2 { from { opacity: 0; transform: scale(.75); } to { opacity: 1; transform: scale(1); } }
+  #result .grade { font-size: 34px; font-weight: 800; letter-spacing: .1em;
+    background: linear-gradient(90deg, #4ade80, #22d3ee);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #result .num { font-size: 15px; color: #94a3b8; margin: 12px 0 4px; }
+  #result .num b { color: #fff; font-size: 22px; }
+  #result .again {
+    margin-top: 18px; width: 100%; padding: 13px; border-radius: 14px; border: none; cursor: pointer;
+    font-size: 15px; font-weight: 700; color: #08101f; letter-spacing: .1em;
+    background: linear-gradient(135deg, #4ade80, #22d3ee);
+    box-shadow: 0 8px 30px rgba(34,211,238,.4);
+  }
+  #result .again:active { transform: scale(.97); }
+
+  @media (max-width: 640px) {
+    .bin .lid { font-size: 24px; }
+    .bin .t { font-size: 11px; }
+    .bin .s { display: none; }
+    #card { width: 150px; height: 150px; }
+    #card .emoji { font-size: 44px; }
+  }
+</style>
+</head>
+<body>
+<div class="blob b1"></div>
+<div class="blob b2"></div>
+
+<div class="stage">
+  <div class="hud">
+    <div class="brand">SORT IT · 垃圾分类</div>
+    <div class="stats">
+      <div class="stat"><i>SCORE</i><b id="score">0</b></div>
+      <div class="stat"><i>COMBO</i><b id="combo">×0</b></div>
+    </div>
+  </div>
+  <div class="bar"><div id="prog"></div></div>
+
+  <div id="cardZone">
+    <div>
+      <div id="q">把物品拖到对应的分类桶</div>
+      <div id="card">
+        <div class="emoji" id="cEmoji">🥫</div>
+        <div class="name" id="cName">易拉罐</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bins" id="bins">
+    <div class="bin" data-type="recycle" style="--c:#22d3ee">
+      <div class="wave"></div><div class="lid">♻️</div><div class="t">可回收物</div><div class="s">RECYCLE</div>
+    </div>
+    <div class="bin" data-type="kitchen" style="--c:#4ade80">
+      <div class="wave"></div><div class="lid">🍂</div><div class="t">厨余垃圾</div><div class="s">KITCHEN</div>
+    </div>
+    <div class="bin" data-type="hazard" style="--c:#f87171">
+      <div class="wave"></div><div class="lid">☢️</div><div class="t">有害垃圾</div><div class="s">HAZARD</div>
+    </div>
+    <div class="bin" data-type="other" style="--c:#fbbf24">
+      <div class="wave"></div><div class="lid">🗑️</div><div class="t">其他垃圾</div><div class="s">OTHER</div>
+    </div>
+  </div>
+</div>
+
+<div id="comboPop"></div>
+
+<div id="result">
+  <div class="box">
+    <div class="grade" id="rGrade">分类达人</div>
+    <div class="num">得分 <b id="rScore">0</b> · 正确 <b id="rRight">0</b>/10</div>
+    <div class="num" id="rTip"></div>
+    <button class="again" id="rBtn">再来一局</button>
+  </div>
+</div>
+
+<script>
+/* ══════════ 题库：中国城市垃圾分类标准 ══════════ */
+const ITEMS = [
+  ['🥫 易拉罐', 'recycle'], ['📦 快递纸箱', 'recycle'], ['🍾 玻璃瓶', 'recycle'],
+  ['📰 旧报纸', 'recycle'], ['🧴 塑料瓶', 'recycle'], ['📱 旧手机', 'recycle'],
+  ['🍎 苹果核', 'kitchen'], ['🍚 剩米饭', 'kitchen'], ['🐟 鱼骨头', 'kitchen'],
+  ['🥬 菜叶', 'kitchen'], ['🥚 鸡蛋壳', 'kitchen'], ['🍌 香蕉皮', 'kitchen'],
+  ['🔋 废电池', 'hazard'], ['💊 过期药', 'hazard'], ['💡 废灯管', 'hazard'],
+  ['🌡️ 水银温度计', 'hazard'], ['🎨 油漆桶', 'hazard'],
+  ['🧻 用过的纸巾', 'other'], ['🚬 烟头', 'other'], ['🏺 陶瓷碎片', 'other'],
+  ['🧹 扫帚尘土', 'other'], ['🍚 沾污外卖盒', 'other']
+];
+const TYPE_NAME = { recycle: '可回收物', kitchen: '厨余垃圾', hazard: '有害垃圾', other: '其他垃圾' };
+const TIP = {
+  recycle: '可回收物：适宜回收利用的废弃物，交给它们一次"再生"的机会。',
+  kitchen: '厨余垃圾：容易腐烂的生物质废弃物，可以堆肥变废为宝。',
+  hazard: '有害垃圾：对人体或环境有害，需要特殊安全处理。',
+  other: '其他垃圾：除了以上三类之外的废弃物，卫生填埋处理。'
+};
+
+const TOTAL = 10;
+let queue = [], idx = 0, score = 0, right = 0, combo = 0;
+
+const card = document.getElementById('card');
+const cEmoji = document.getElementById('cEmoji');
+const cName = document.getElementById('cName');
+const scoreEl = document.getElementById('score');
+const comboEl = document.getElementById('combo');
+const progEl = document.getElementById('prog');
+
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+function start() {
+  queue = shuffle([...ITEMS]).slice(0, TOTAL);
+  idx = 0; score = 0; right = 0; combo = 0;
+  scoreEl.textContent = 0; comboEl.textContent = '×0'; progEl.style.width = '0%';
+  document.getElementById('result').classList.remove('show');
+  next();
+}
+
+function next() {
+  if (idx >= TOTAL) return finish();
+  const [label, type] = queue[idx];
+  card.dataset.type = type;
+  card.dataset.label = label.split(' ')[1] || label;
+  const sp = label.indexOf(' ');
+  cEmoji.textContent = label.slice(0, sp);
+  cName.textContent = label.slice(sp + 1);
+  card.classList.remove('gone', 'shake', 'dragging');
+  card.style.transition = '';
+  card.style.transform = '';
+  card.style.opacity = '';
+  /* 重触发入场动画 */
+  card.style.animation = 'none';
+  void card.offsetWidth;
+  card.style.animation = '';
+  document.getElementById('q').textContent = `第 ${idx + 1} / ${TOTAL} 题 · 把它拖到对应的桶`;
+}
+
+/* ══════════ 拖拽（Pointer Events，触屏与鼠标统一） ══════════ */
+let dragging = false, offX = 0, offY = 0;
+const bins = [...document.querySelectorAll('.bin')];
+
+card.addEventListener('pointerdown', e => {
+  dragging = true;
+  card.setPointerCapture(e.pointerId);
+  card.classList.add('dragging');
+  const r = card.getBoundingClientRect();
+  offX = e.clientX - (r.left + r.width / 2);
+  offY = e.clientY - (r.top + r.height / 2);
+  card.style.transition = 'none';
+});
+
+card.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  card.style.transform = `translate(${e.clientX - offX - cardCenter().x}px, ${e.clientY - offY - cardCenter().y}px) scale(1.08) rotate(${(e.clientX - offX) * 0.02}deg)`;
+  const hit = binAt(e.clientX, e.clientY);
+  bins.forEach(b => b.classList.toggle('hot', b === hit));
+});
+
+card.addEventListener('pointerup', e => {
+  if (!dragging) return;
+  dragging = false;
+  const bin = binAt(e.clientX, e.clientY);
+  bins.forEach(b => b.classList.remove('hot'));
+  if (bin) judge(bin, e);
+  else { card.classList.remove('dragging'); card.style.transition = 'transform .3s cubic-bezier(.2,.8,.2,1)'; card.style.transform = ''; }
+});
+
+function cardCenter() {
+  const r = card.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+function binAt(x, y) {
+  return bins.find(b => {
+    const r = b.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  });
+}
+
+/* ══════════ 判定 ══════════ */
+function judge(bin, e) {
+  const correct = bin.dataset.type === card.dataset.type;
+  const wave = bin.querySelector('.wave');
+  wave.classList.remove('ok'); void wave.offsetWidth;
+
+  if (correct) {
+    combo++;
+    right++;
+    const gain = 10 + combo * 2;
+    score += gain;
+    bin.classList.add('ok');
+    wave.classList.add('ok');
+    flyTo(bin, e);
+    if (combo >= 2) comboPop(combo);
+  } else {
+    combo = 0;
+    bin.classList.add('err');
+    card.classList.add('shake');
+    setTimeout(() => bin.classList.remove('err'), 450);
+    toastErr(bin.dataset.type);
+  }
+
+  scoreEl.textContent = score;
+  comboEl.textContent = '×' + combo;
+  progEl.style.width = ((idx + 1) / TOTAL * 100) + '%';
+
+  setTimeout(() => {
+    card.classList.remove('shake', 'dragging');
+    card.style.transform = '';
+    bin.classList.remove('ok');
+    idx++;
+    next();
+  }, correct ? 480 : 700);
+}
+
+/* 正确：卡片飞进桶并消失 */
+function flyTo(bin, e) {
+  const br = bin.getBoundingClientRect();
+  const cr = card.getBoundingClientRect();
+  const dx = (br.left + br.width / 2) - (cr.left + cr.width / 2);
+  const dy = (br.top + br.height / 2) - (cr.top + cr.height / 2);
+  card.classList.remove('dragging');
+  card.style.transition = 'all .42s cubic-bezier(.5,-.3,.8,.5)';
+  card.style.transform = `translate(${dx}px, ${dy}px) scale(.15) rotate(${dx > 0 ? 40 : -40}deg)`;
+  card.classList.add('gone');
+}
+
+let errTimer;
+function toastErr(type) {
+  const q = document.getElementById('q');
+  q.innerHTML = `❌ ${card.dataset.label} 属于 <b style="color:#f87171">${TYPE_NAME[type]}</b> · ${TIP[type].slice(0, 18)}…`;
+  clearTimeout(errTimer);
+  errTimer = setTimeout(() => {
+    document.getElementById('q').textContent = '把物品拖到对应的分类桶';
+  }, 1600);
+}
+
+function comboPop(n) {
+  const el = document.getElementById('comboPop');
+  el.textContent = `COMBO ×${n}!`;
+  el.classList.remove('show'); void el.offsetWidth;
+  el.classList.add('show');
+}
+
+function finish() {
+  const rate = right / TOTAL;
+  const grade = rate === 1 ? '分类大师' : rate >= 0.8 ? '环保达人' : rate >= 0.6 ? '还需练习' : '从头学分类';
+  document.getElementById('rGrade').textContent = grade;
+  document.getElementById('rScore').textContent = score;
+  document.getElementById('rRight').textContent = right;
+  document.getElementById('rTip').textContent = right < TOTAL ? '错题的提示会出现在题目下方，再试一次！' : '全对！扔垃圾前记得先分一分。';
+  document.getElementById('result').classList.add('show');
+}
+
+document.getElementById('rBtn').addEventListener('click', start);
+start();
+</script>
+</body>
+</html>
